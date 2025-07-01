@@ -221,13 +221,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe subscription routes
+  // Stripe subscription routes - handles both free tier setup and paid subscriptions
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { tier } = req.body;
       
-      if (!['starter', 'pro', 'enterprise'].includes(tier)) {
+      if (!['free', 'starter', 'pro', 'enterprise'].includes(tier)) {
         return res.status(400).json({ message: "Invalid subscription tier" });
       }
 
@@ -247,7 +247,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerId = customer.id;
       }
 
-      // Create product first
+      if (tier === 'free') {
+        // For free tier, create a setup intent to collect payment method
+        const setupIntent = await stripe.setupIntents.create({
+          customer: customerId,
+          usage: 'off_session',
+        });
+
+        // Update user subscription to free tier
+        await storage.updateUserSubscription(userId, 'free', 'active');
+
+        res.json({
+          clientSecret: setupIntent.client_secret,
+          tier: 'free',
+          requiresPaymentMethod: true,
+        });
+        return;
+      }
+
+      // For paid tiers, create product and subscription
       const product = await stripe.products.create({
         name: `SocialBoost ${tier.charAt(0).toUpperCase() + tier.slice(1)} Plan`,
       });

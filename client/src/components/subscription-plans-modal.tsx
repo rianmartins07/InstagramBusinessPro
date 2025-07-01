@@ -23,12 +23,26 @@ interface SubscriptionPlansModalProps {
 
 const plans = [
   {
+    id: "free",
+    name: "Free",
+    price: "$0",
+    description: "Get started with basic features",
+    features: [
+      "5 posts per month",
+      "Basic analytics",
+      "Post scheduling",
+      "Community support"
+    ],
+    popular: false,
+    note: "Credit card required for verification"
+  },
+  {
     id: "starter",
     name: "Starter",
     price: "$9",
     description: "Perfect for small businesses",
     features: [
-      "15 posts per month",
+      "50 posts per month",
       "Basic analytics",
       "Post scheduling",
       "Email support"
@@ -121,27 +135,53 @@ export default function SubscriptionPlansModal({ isOpen, onClose }: Subscription
 
     setIsProcessing(true);
 
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: window.location.origin,
-      },
-      redirect: "if_required",
-    });
+    // Check if this is a free tier setup intent or paid subscription
+    if (selectedPlan === 'free') {
+      const { error } = await stripe.confirmSetup({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin,
+        },
+        redirect: "if_required",
+      });
 
-    if (error) {
-      toast({
-        title: "Payment Failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error) {
+        toast({
+          title: "Payment Method Setup Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Payment Method Added",
+          description: "Your free account has been activated!",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        onClose();
+      }
     } else {
-      toast({
-        title: "Payment Successful",
-        description: "Your subscription has been activated!",
+      const { error } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: window.location.origin,
+        },
+        redirect: "if_required",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      onClose();
+
+      if (error) {
+        toast({
+          title: "Payment Failed",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Payment Successful",
+          description: "Your subscription has been activated!",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        onClose();
+      }
     }
 
     setIsProcessing(false);
@@ -193,6 +233,11 @@ export default function SubscriptionPlansModal({ isOpen, onClose }: Subscription
                     <span className="text-gray-600">/month</span>
                   </div>
                   <p className="text-gray-600 mt-2">{plan.description}</p>
+                  {plan.note && (
+                    <p className="text-xs text-amber-600 mt-2 bg-amber-50 px-2 py-1 rounded">
+                      {plan.note}
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 mb-6">
@@ -214,7 +259,7 @@ export default function SubscriptionPlansModal({ isOpen, onClose }: Subscription
                       </>
                     ) : plan.id === "enterprise" ? (
                       "Contact Sales"
-                    ) : user?.subscriptionTier === plan.id ? (
+                    ) : (user as any)?.subscriptionTier === plan.id ? (
                       "Current Plan"
                     ) : (
                       "Select Plan"
