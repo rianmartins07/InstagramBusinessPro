@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: socialboost-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: socialboost
+      POSTGRES_USER: socialboost
+      POSTGRES_PASSWORD: socialboost123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - socialboost-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socialboost -d socialboost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for session storage (optional, can use PostgreSQL)
+  redis:
+    image: redis:7-alpine
+    container_name: socialboost-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - socialboost-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Main Application
+  app:
+    build: .
+    container_name: socialboost-app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      DATABASE_URL: postgresql://socialboost:socialboost123@db:5432/socialboost
+      PGHOST: db
+      PGPORT: 5432
+      PGUSER: socialboost
+      PGPASSWORD: socialboost123
+      PGDATABASE: socialboost
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379
+      
+      # Application Configuration
+      NODE_ENV: production
+      PORT: 5000
+      
+      # Session Configuration
+      SESSION_SECRET: your-super-secret-session-key-change-this-in-production
+      
+      # Stripe Configuration (set these in .env file)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      VITE_STRIPE_PUBLIC_KEY: ${VITE_STRIPE_PUBLIC_KEY}
+      
+      # Replit Auth Configuration (if using Replit)
+      REPL_ID: ${REPL_ID:-}
+      ISSUER_URL: ${ISSUER_URL:-https://replit.com/oidc}
+      REPLIT_DOMAINS: ${REPLIT_DOMAINS:-localhost:5000}
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+    networks:
+      - socialboost-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy (optional, for production)
+  nginx:
+    image: nginx:alpine
+    container_name: socialboost-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - socialboost-network
+
+volumes:
+  postgres_data:
+  uploads:
+  logs:
+
+networks:
+  socialboost-network:
+    driver: bridge

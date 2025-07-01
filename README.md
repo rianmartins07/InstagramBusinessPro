@@ -66,6 +66,24 @@ REPLIT_DOMAINS=your-domain.replit.dev
 
 ## Getting Started
 
+You can run SocialBoost in two ways:
+
+### Option A: Docker (Recommended for Production)
+
+The fastest way to get SocialBoost running with all dependencies:
+
+```bash
+git clone <your-repo-url>
+cd socialboost
+
+# Quick setup with Docker
+./docker-run.sh
+```
+
+See [DOCKER.md](DOCKER.md) for complete Docker setup instructions.
+
+### Option B: Local Development
+
 ### 1. Clone the Repository
 
 ```bash

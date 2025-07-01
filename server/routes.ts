@@ -29,6 +29,16 @@ const SUBSCRIPTION_PRICES = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({ 
+      status: 'healthy', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: process.env.npm_package_version || '1.0.0'
+    });
+  });
+
   // Auth middleware
   await setupAuth(app);
 
