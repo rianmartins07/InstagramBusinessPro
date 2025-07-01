@@ -141,4 +141,8 @@ Changelog:
 
 ```
 Preferred communication style: Simple, everyday language.
+Project Requirements:
+- Free tier must require credit card verification to prevent spam
+- All tiers require payment method setup through Stripe
+- Clear documentation for self-hosting and deployment
 ```
